@@ -1,0 +1,214 @@
+<html>
+<head>
+<title>AiRefactor.py</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #cf8e6d;}
+.s1 { color: #bcbec4;}
+.s2 { color: #bcbec4;}
+.s3 { color: #7a7e85;}
+.s4 { color: #2aacb8;}
+.s5 { color: #6aab73;}
+</style>
+</head>
+<body bgcolor="#1e1f22">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#606060" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+AiRefactor.py</font>
+</center></td></tr></table>
+<pre><span class="s0">import </span><span class="s1">pandas </span><span class="s0">as </span><span class="s1">pd</span>
+<span class="s0">import </span><span class="s1">neat</span>
+<span class="s0">import </span><span class="s1">numpy </span><span class="s0">as </span><span class="s1">np</span>
+<span class="s0">from </span><span class="s1">sklearn</span><span class="s2">.</span><span class="s1">model_selection </span><span class="s0">import </span><span class="s1">KFold</span>
+<span class="s0">from </span><span class="s1">sklearn</span><span class="s2">.</span><span class="s1">preprocessing </span><span class="s0">import </span><span class="s1">StandardScaler</span>
+<span class="s0">from </span><span class="s1">sklearn</span><span class="s2">.</span><span class="s1">preprocessing </span><span class="s0">import </span><span class="s1">MinMaxScaler</span><span class="s3"># Import MinMaxScaler</span>
+<span class="s0">import </span><span class="s1">matplotlib</span><span class="s2">.</span><span class="s1">pyplot </span><span class="s0">as </span><span class="s1">plt</span>
+<span class="s0">import </span><span class="s1">scipy</span><span class="s2">.</span><span class="s1">stats </span><span class="s0">as </span><span class="s1">stats</span>
+<span class="s0">import </span><span class="s1">os</span>
+<span class="s0">import </span><span class="s1">joblib</span>
+<span class="s0">import </span><span class="s1">gym</span>
+<span class="s0">import </span><span class="s1">math  </span><span class="s3"># Import the math module</span>
+
+<span class="s3"># 1. Define your custom activation function</span>
+<span class="s0">def </span><span class="s1">my_sinc_function</span><span class="s2">(</span><span class="s1">x</span><span class="s2">):</span>
+    <span class="s0">if </span><span class="s1">x </span><span class="s2">== </span><span class="s4">0</span><span class="s2">:</span>
+        <span class="s0">return </span><span class="s4">1.0</span>
+    <span class="s0">else</span><span class="s2">:</span>
+        <span class="s0">return </span><span class="s1">math</span><span class="s2">.</span><span class="s1">sin</span><span class="s2">(</span><span class="s1">x</span><span class="s2">) / </span><span class="s1">x</span>
+
+<span class="s3"># 2. Define your custom aggregation function</span>
+<span class="s0">def </span><span class="s1">my_l2norm_function</span><span class="s2">(</span><span class="s1">x</span><span class="s2">):</span>
+    <span class="s0">return </span><span class="s1">np</span><span class="s2">.</span><span class="s1">sqrt</span><span class="s2">(</span><span class="s1">np</span><span class="s2">.</span><span class="s1">sum</span><span class="s2">(</span><span class="s1">np</span><span class="s2">.</span><span class="s1">square</span><span class="s2">(</span><span class="s1">x</span><span class="s2">)))</span>
+
+<span class="s0">class </span><span class="s1">AI_Creait</span><span class="s2">():</span>
+    <span class="s0">def </span><span class="s1">__init__</span><span class="s2">(</span><span class="s1">self</span><span class="s2">, </span><span class="s1">config_file</span><span class="s2">, </span><span class="s1">model_path</span><span class="s2">=</span><span class="s5">''</span><span class="s2">):</span>
+        <span class="s1">self</span><span class="s2">.</span><span class="s1">df_training </span><span class="s2">= </span><span class="s1">pd</span><span class="s2">.</span><span class="s1">read_csv</span><span class="s2">(</span><span class="s5">r'C:\Users\user\PycharmProjects\SchoolProject\AIAppraiserAllFiles\ExecutableDirectory\first_DFFP.csv'</span><span class="s2">)</span>
+        <span class="s1">self</span><span class="s2">.</span><span class="s1">df_check </span><span class="s2">= </span><span class="s1">pd</span><span class="s2">.</span><span class="s1">read_csv</span><span class="s2">(</span><span class="s5">r'C:\Users\user\PycharmProjects\SchoolProject\AIAppraiserAllFiles\ExecutableDirectory\last_DFFP.csv'</span><span class="s2">)</span>
+        <span class="s1">self</span><span class="s2">.</span><span class="s1">config_file </span><span class="s2">= </span><span class="s1">config_file</span>
+        <span class="s1">self</span><span class="s2">.</span><span class="s1">config </span><span class="s2">= </span><span class="s1">neat</span><span class="s2">.</span><span class="s1">Config</span><span class="s2">(</span><span class="s1">neat</span><span class="s2">.</span><span class="s1">DefaultGenome</span><span class="s2">, </span><span class="s1">neat</span><span class="s2">.</span><span class="s1">DefaultReproduction</span><span class="s2">,</span>
+                                 <span class="s1">neat</span><span class="s2">.</span><span class="s1">DefaultSpeciesSet</span><span class="s2">, </span><span class="s1">neat</span><span class="s2">.</span><span class="s1">DefaultStagnation</span><span class="s2">,</span>
+                                 <span class="s1">config_file</span><span class="s2">)</span>
+
+        <span class="s3"># 3. Register the custom activation function in config</span>
+        <span class="s1">self</span><span class="s2">.</span><span class="s1">config</span><span class="s2">.</span><span class="s1">genome_config</span><span class="s2">.</span><span class="s1">activation_defs</span><span class="s2">.</span><span class="s1">add</span><span class="s2">(</span><span class="s5">&quot;my_sinc_function&quot;</span><span class="s2">, </span><span class="s1">my_sinc_function</span><span class="s2">)</span>
+
+        <span class="s3"># 4. Register the custom aggregation function in config</span>
+        <span class="s1">self</span><span class="s2">.</span><span class="s1">config</span><span class="s2">.</span><span class="s1">genome_config</span><span class="s2">.</span><span class="s1">aggregation_function_defs</span><span class="s2">.</span><span class="s1">add</span><span class="s2">(</span><span class="s5">&quot;my_l2norm_function&quot;</span><span class="s2">, </span><span class="s1">my_l2norm_function</span><span class="s2">)</span>
+
+        <span class="s1">self</span><span class="s2">.</span><span class="s1">model </span><span class="s2">= </span><span class="s0">None</span>
+        <span class="s1">self</span><span class="s2">.</span><span class="s1">scaler </span><span class="s2">= </span><span class="s0">None</span>
+        <span class="s1">self</span><span class="s2">.</span><span class="s1">price_scaler </span><span class="s2">= </span><span class="s0">None  </span><span class="s3"># Scaler for the 'Price' column</span>
+        <span class="s1">self</span><span class="s2">.</span><span class="s1">scaler_path </span><span class="s2">= </span><span class="s1">model_path</span><span class="s2">.</span><span class="s1">replace</span><span class="s2">(</span><span class="s5">'.neat'</span><span class="s2">, </span><span class="s5">'_scaler.pkl'</span><span class="s2">)</span>
+        <span class="s1">self</span><span class="s2">.</span><span class="s1">price_scaler_path </span><span class="s2">= </span><span class="s1">model_path</span><span class="s2">.</span><span class="s1">replace</span><span class="s2">(</span><span class="s5">'.neat'</span><span class="s2">, </span><span class="s5">'_price_scaler.pkl'</span><span class="s2">)</span>
+
+        <span class="s0">if </span><span class="s1">os</span><span class="s2">.</span><span class="s1">path</span><span class="s2">.</span><span class="s1">exists</span><span class="s2">(</span><span class="s1">model_path</span><span class="s2">) </span><span class="s0">and </span><span class="s1">os</span><span class="s2">.</span><span class="s1">path</span><span class="s2">.</span><span class="s1">exists</span><span class="s2">(</span><span class="s1">self</span><span class="s2">.</span><span class="s1">scaler_path</span><span class="s2">) </span><span class="s0">and </span><span class="s1">os</span><span class="s2">.</span><span class="s1">path</span><span class="s2">.</span><span class="s1">exists</span><span class="s2">(</span><span class="s1">self</span><span class="s2">.</span><span class="s1">price_scaler_path</span><span class="s2">):</span>
+            <span class="s1">print</span><span class="s2">(</span><span class="s5">&quot;Loading existing model and scalers...&quot;</span><span class="s2">)</span>
+            <span class="s1">self</span><span class="s2">.</span><span class="s1">model </span><span class="s2">= </span><span class="s1">joblib</span><span class="s2">.</span><span class="s1">load</span><span class="s2">(</span><span class="s1">model_path</span><span class="s2">)</span>
+            <span class="s1">self</span><span class="s2">.</span><span class="s1">scaler </span><span class="s2">= </span><span class="s1">joblib</span><span class="s2">.</span><span class="s1">load</span><span class="s2">(</span><span class="s1">self</span><span class="s2">.</span><span class="s1">scaler_path</span><span class="s2">)</span>
+            <span class="s1">self</span><span class="s2">.</span><span class="s1">price_scaler </span><span class="s2">= </span><span class="s1">joblib</span><span class="s2">.</span><span class="s1">load</span><span class="s2">(</span><span class="s1">self</span><span class="s2">.</span><span class="s1">price_scaler_path</span><span class="s2">)</span>
+        <span class="s0">else</span><span class="s2">:</span>
+            <span class="s1">print</span><span class="s2">(</span><span class="s5">&quot;Model or scalers not found. Training new model...&quot;</span><span class="s2">)</span>
+
+    <span class="s0">def </span><span class="s1">df_division</span><span class="s2">(</span><span class="s1">self</span><span class="s2">, </span><span class="s1">df</span><span class="s2">):</span>
+        <span class="s1">X </span><span class="s2">= </span><span class="s1">df</span><span class="s2">[[</span><span class="s5">'Cup'</span><span class="s2">, </span><span class="s5">'Hero'</span><span class="s2">]]</span>
+        <span class="s1">y </span><span class="s2">= </span><span class="s1">df</span><span class="s2">[</span><span class="s5">'Price'</span><span class="s2">]</span>
+        <span class="s0">return </span><span class="s1">X</span><span class="s2">, </span><span class="s1">y</span>
+
+    <span class="s0">def </span><span class="s1">eval_genome</span><span class="s2">(</span><span class="s1">self</span><span class="s2">, </span><span class="s1">genome</span><span class="s2">, </span><span class="s1">config</span><span class="s2">):</span>
+        <span class="s1">net </span><span class="s2">= </span><span class="s1">neat</span><span class="s2">.</span><span class="s1">nn</span><span class="s2">.</span><span class="s1">FeedForwardNetwork</span><span class="s2">.</span><span class="s1">create</span><span class="s2">(</span><span class="s1">genome</span><span class="s2">, </span><span class="s1">config</span><span class="s2">)</span>
+        <span class="s1">X</span><span class="s2">, </span><span class="s1">y </span><span class="s2">= </span><span class="s1">self</span><span class="s2">.</span><span class="s1">df_division</span><span class="s2">(</span><span class="s1">self</span><span class="s2">.</span><span class="s1">df_training</span><span class="s2">)</span>
+
+        <span class="s3"># Scale features</span>
+        <span class="s1">X_scaled </span><span class="s2">= </span><span class="s1">self</span><span class="s2">.</span><span class="s1">scaler</span><span class="s2">.</span><span class="s1">transform</span><span class="s2">(</span><span class="s1">X</span><span class="s2">)</span>
+
+        <span class="s3"># Scale target variable 'Price'</span>
+        <span class="s1">y_scaled </span><span class="s2">= </span><span class="s1">self</span><span class="s2">.</span><span class="s1">price_scaler</span><span class="s2">.</span><span class="s1">transform</span><span class="s2">(</span><span class="s1">y</span><span class="s2">.</span><span class="s1">values</span><span class="s2">.</span><span class="s1">reshape</span><span class="s2">(-</span><span class="s4">1</span><span class="s2">, </span><span class="s4">1</span><span class="s2">)).</span><span class="s1">flatten</span><span class="s2">()</span>
+
+        <span class="s1">predictions </span><span class="s2">= []</span>
+        <span class="s0">for </span><span class="s1">xi </span><span class="s0">in </span><span class="s1">X_scaled</span><span class="s2">:</span>
+            <span class="s1">output </span><span class="s2">= </span><span class="s1">net</span><span class="s2">.</span><span class="s1">activate</span><span class="s2">(</span><span class="s1">xi</span><span class="s2">)</span>
+            <span class="s1">predictions</span><span class="s2">.</span><span class="s1">append</span><span class="s2">(</span><span class="s1">output</span><span class="s2">[</span><span class="s4">0</span><span class="s2">])</span>
+
+        <span class="s1">predictions </span><span class="s2">= </span><span class="s1">np</span><span class="s2">.</span><span class="s1">array</span><span class="s2">(</span><span class="s1">predictions</span><span class="s2">)</span>
+        <span class="s1">fitness </span><span class="s2">= </span><span class="s1">np</span><span class="s2">.</span><span class="s1">mean</span><span class="s2">((</span><span class="s1">predictions </span><span class="s2">- </span><span class="s1">y_scaled</span><span class="s2">) ** </span><span class="s4">2</span><span class="s2">)  </span><span class="s3"># MSE as fitness</span>
+        <span class="s0">return </span><span class="s2">-</span><span class="s1">fitness  </span><span class="s3"># NEAT maximizes fitness, so minimize MSE</span>
+
+
+    <span class="s0">def </span><span class="s1">train_model_with_neat</span><span class="s2">(</span><span class="s1">self</span><span class="s2">, </span><span class="s1">n_splits</span><span class="s2">=</span><span class="s4">30</span><span class="s2">):</span>
+        <span class="s0">if </span><span class="s1">self</span><span class="s2">.</span><span class="s1">model </span><span class="s0">is not None and </span><span class="s1">self</span><span class="s2">.</span><span class="s1">scaler </span><span class="s0">is not None and </span><span class="s1">self</span><span class="s2">.</span><span class="s1">price_scaler </span><span class="s0">is not None</span><span class="s2">:</span>
+            <span class="s1">print</span><span class="s2">(</span><span class="s5">&quot;Model and scalers already loaded. Skipping training.&quot;</span><span class="s2">)</span>
+            <span class="s0">return</span>
+
+        <span class="s1">print</span><span class="s2">(</span><span class="s5">&quot;Starting NEAT training...&quot;</span><span class="s2">)</span>
+        <span class="s1">X</span><span class="s2">, </span><span class="s1">y </span><span class="s2">= </span><span class="s1">self</span><span class="s2">.</span><span class="s1">df_division</span><span class="s2">(</span><span class="s1">self</span><span class="s2">.</span><span class="s1">df_training</span><span class="s2">)</span>
+
+        <span class="s3"># Initialize scalers</span>
+        <span class="s1">self</span><span class="s2">.</span><span class="s1">scaler </span><span class="s2">= </span><span class="s1">StandardScaler</span><span class="s2">()</span>
+        <span class="s1">self</span><span class="s2">.</span><span class="s1">price_scaler </span><span class="s2">= </span><span class="s1">MinMaxScaler</span><span class="s2">()  </span><span class="s3"># Use MinMaxScaler for 'Price'</span>
+
+        <span class="s3"># Scale features</span>
+        <span class="s1">X_scaled </span><span class="s2">= </span><span class="s1">self</span><span class="s2">.</span><span class="s1">scaler</span><span class="s2">.</span><span class="s1">fit_transform</span><span class="s2">(</span><span class="s1">X</span><span class="s2">)</span>
+
+        <span class="s3"># Scale target variable 'Price'</span>
+        <span class="s1">y_scaled </span><span class="s2">= </span><span class="s1">self</span><span class="s2">.</span><span class="s1">price_scaler</span><span class="s2">.</span><span class="s1">fit_transform</span><span class="s2">(</span><span class="s1">y</span><span class="s2">.</span><span class="s1">values</span><span class="s2">.</span><span class="s1">reshape</span><span class="s2">(-</span><span class="s4">1</span><span class="s2">, </span><span class="s4">1</span><span class="s2">)).</span><span class="s1">flatten</span><span class="s2">()</span>
+
+        <span class="s3"># K-Fold cross-validation</span>
+        <span class="s1">kf </span><span class="s2">= </span><span class="s1">KFold</span><span class="s2">(</span><span class="s1">n_splits</span><span class="s2">=</span><span class="s1">n_splits</span><span class="s2">, </span><span class="s1">shuffle</span><span class="s2">=</span><span class="s0">True</span><span class="s2">, </span><span class="s1">random_state</span><span class="s2">=</span><span class="s4">42</span><span class="s2">)</span>
+        <span class="s1">fold_fitnesses </span><span class="s2">= []</span>
+
+        <span class="s0">for </span><span class="s1">fold</span><span class="s2">, (</span><span class="s1">train_index</span><span class="s2">, </span><span class="s1">test_index</span><span class="s2">) </span><span class="s0">in </span><span class="s1">enumerate</span><span class="s2">(</span><span class="s1">kf</span><span class="s2">.</span><span class="s1">split</span><span class="s2">(</span><span class="s1">X_scaled</span><span class="s2">, </span><span class="s1">y_scaled</span><span class="s2">), </span><span class="s4">1</span><span class="s2">):</span>
+            <span class="s1">print</span><span class="s2">(</span><span class="s5">f&quot;Training fold </span><span class="s0">{</span><span class="s1">fold</span><span class="s0">}</span><span class="s5">...&quot;</span><span class="s2">)</span>
+            <span class="s1">X_train</span><span class="s2">, </span><span class="s1">X_test </span><span class="s2">= </span><span class="s1">X_scaled</span><span class="s2">[</span><span class="s1">train_index</span><span class="s2">], </span><span class="s1">X_scaled</span><span class="s2">[</span><span class="s1">test_index</span><span class="s2">]</span>
+            <span class="s1">y_train</span><span class="s2">, </span><span class="s1">y_test </span><span class="s2">= </span><span class="s1">y_scaled</span><span class="s2">[</span><span class="s1">train_index</span><span class="s2">], </span><span class="s1">y_scaled</span><span class="s2">[</span><span class="s1">test_index</span><span class="s2">]</span>
+
+            <span class="s3"># Prepare the fitness function with the current fold data</span>
+            <span class="s0">def </span><span class="s1">eval_genomes</span><span class="s2">(</span><span class="s1">genomes</span><span class="s2">, </span><span class="s1">config</span><span class="s2">):</span>
+                <span class="s0">for </span><span class="s1">genome_id</span><span class="s2">, </span><span class="s1">genome </span><span class="s0">in </span><span class="s1">genomes</span><span class="s2">:</span>
+                    <span class="s1">net </span><span class="s2">= </span><span class="s1">neat</span><span class="s2">.</span><span class="s1">nn</span><span class="s2">.</span><span class="s1">FeedForwardNetwork</span><span class="s2">.</span><span class="s1">create</span><span class="s2">(</span><span class="s1">genome</span><span class="s2">, </span><span class="s1">config</span><span class="s2">)</span>
+
+                    <span class="s3"># Make predictions on the test set for this fold</span>
+                    <span class="s1">predictions </span><span class="s2">= []</span>
+                    <span class="s0">for </span><span class="s1">xi </span><span class="s0">in </span><span class="s1">X_test</span><span class="s2">:</span>
+                        <span class="s1">output </span><span class="s2">= </span><span class="s1">net</span><span class="s2">.</span><span class="s1">activate</span><span class="s2">(</span><span class="s1">xi</span><span class="s2">)</span>
+                        <span class="s1">predictions</span><span class="s2">.</span><span class="s1">append</span><span class="s2">(</span><span class="s1">output</span><span class="s2">[</span><span class="s4">0</span><span class="s2">])  </span><span class="s3"># Assuming a single output neuron</span>
+                    <span class="s1">predictions </span><span class="s2">= </span><span class="s1">np</span><span class="s2">.</span><span class="s1">array</span><span class="s2">(</span><span class="s1">predictions</span><span class="s2">)</span>
+
+                    <span class="s3"># Calculate the fitness (mean squared error)</span>
+                    <span class="s1">fitness </span><span class="s2">= </span><span class="s1">np</span><span class="s2">.</span><span class="s1">mean</span><span class="s2">((</span><span class="s1">predictions </span><span class="s2">- </span><span class="s1">y_test</span><span class="s2">) ** </span><span class="s4">2</span><span class="s2">)</span>
+                    <span class="s1">genome</span><span class="s2">.</span><span class="s1">fitness </span><span class="s2">= -</span><span class="s1">fitness  </span><span class="s3"># NEAT tries to maximize fitness</span>
+
+            <span class="s3"># Create the population, which is the top-level object for a NEAT run.</span>
+            <span class="s1">p </span><span class="s2">= </span><span class="s1">neat</span><span class="s2">.</span><span class="s1">Population</span><span class="s2">(</span><span class="s1">self</span><span class="s2">.</span><span class="s1">config</span><span class="s2">)</span>
+
+            <span class="s3"># Add a stdout reporter to show progress in the terminal.</span>
+            <span class="s1">p</span><span class="s2">.</span><span class="s1">add_reporter</span><span class="s2">(</span><span class="s1">neat</span><span class="s2">.</span><span class="s1">StdOutReporter</span><span class="s2">(</span><span class="s0">True</span><span class="s2">))</span>
+            <span class="s1">stats </span><span class="s2">= </span><span class="s1">neat</span><span class="s2">.</span><span class="s1">StatisticsReporter</span><span class="s2">()</span>
+            <span class="s1">p</span><span class="s2">.</span><span class="s1">add_reporter</span><span class="s2">(</span><span class="s1">stats</span><span class="s2">)</span>
+            <span class="s1">p</span><span class="s2">.</span><span class="s1">add_reporter</span><span class="s2">(</span><span class="s1">neat</span><span class="s2">.</span><span class="s1">Checkpointer</span><span class="s2">(</span><span class="s1">generation_interval</span><span class="s2">=</span><span class="s4">100</span><span class="s2">, </span><span class="s1">filename_prefix</span><span class="s2">=</span><span class="s5">&quot;neat-checkpoint-&quot;</span><span class="s2">))</span>
+
+            <span class="s3"># Run NEAT</span>
+            <span class="s1">winner </span><span class="s2">= </span><span class="s1">p</span><span class="s2">.</span><span class="s1">run</span><span class="s2">(</span><span class="s1">eval_genomes</span><span class="s2">, </span><span class="s1">n</span><span class="s2">=</span><span class="s4">300</span><span class="s2">)</span>
+
+            <span class="s3"># Store the best genome</span>
+            <span class="s1">self</span><span class="s2">.</span><span class="s1">model </span><span class="s2">= </span><span class="s1">winner</span>
+
+            <span class="s3"># Evaluate the best genome on the test set</span>
+            <span class="s1">net </span><span class="s2">= </span><span class="s1">neat</span><span class="s2">.</span><span class="s1">nn</span><span class="s2">.</span><span class="s1">FeedForwardNetwork</span><span class="s2">.</span><span class="s1">create</span><span class="s2">(</span><span class="s1">winner</span><span class="s2">, </span><span class="s1">self</span><span class="s2">.</span><span class="s1">config</span><span class="s2">)</span>
+            <span class="s1">predictions </span><span class="s2">= []</span>
+            <span class="s0">for </span><span class="s1">xi </span><span class="s0">in </span><span class="s1">X_test</span><span class="s2">:</span>
+                <span class="s1">output </span><span class="s2">= </span><span class="s1">net</span><span class="s2">.</span><span class="s1">activate</span><span class="s2">(</span><span class="s1">xi</span><span class="s2">)</span>
+                <span class="s1">predictions</span><span class="s2">.</span><span class="s1">append</span><span class="s2">(</span><span class="s1">output</span><span class="s2">[</span><span class="s4">0</span><span class="s2">])  </span><span class="s3"># Assuming a single output neuron</span>
+            <span class="s1">predictions </span><span class="s2">= </span><span class="s1">np</span><span class="s2">.</span><span class="s1">array</span><span class="s2">(</span><span class="s1">predictions</span><span class="s2">)</span>
+            <span class="s1">fitness </span><span class="s2">= </span><span class="s1">np</span><span class="s2">.</span><span class="s1">mean</span><span class="s2">((</span><span class="s1">predictions </span><span class="s2">- </span><span class="s1">y_test</span><span class="s2">) ** </span><span class="s4">2</span><span class="s2">)</span>
+            <span class="s1">fold_fitnesses</span><span class="s2">.</span><span class="s1">append</span><span class="s2">(-</span><span class="s1">fitness</span><span class="s2">)</span>
+            <span class="s1">print</span><span class="s2">(</span><span class="s5">f&quot;Fold </span><span class="s0">{</span><span class="s1">fold</span><span class="s0">} </span><span class="s5">fitness: </span><span class="s0">{</span><span class="s2">-</span><span class="s1">fitness</span><span class="s0">}</span><span class="s5">&quot;</span><span class="s2">)</span>
+
+        <span class="s1">average_fitness </span><span class="s2">= </span><span class="s1">sum</span><span class="s2">(</span><span class="s1">fold_fitnesses</span><span class="s2">) / </span><span class="s1">len</span><span class="s2">(</span><span class="s1">fold_fitnesses</span><span class="s2">)</span>
+        <span class="s1">print</span><span class="s2">(</span><span class="s5">f'Average Fitness across </span><span class="s0">{</span><span class="s1">n_splits</span><span class="s0">} </span><span class="s5">folds: </span><span class="s0">{</span><span class="s1">average_fitness</span><span class="s0">}</span><span class="s5">'</span><span class="s2">)</span>
+
+        <span class="s1">joblib</span><span class="s2">.</span><span class="s1">dump</span><span class="s2">(</span><span class="s1">self</span><span class="s2">.</span><span class="s1">model</span><span class="s2">, </span><span class="s5">'AIAppraiser.neat'</span><span class="s2">)</span>
+        <span class="s1">joblib</span><span class="s2">.</span><span class="s1">dump</span><span class="s2">(</span><span class="s1">self</span><span class="s2">.</span><span class="s1">scaler</span><span class="s2">, </span><span class="s5">'AIAppraiser_scaler.pkl'</span><span class="s2">)</span>
+        <span class="s1">joblib</span><span class="s2">.</span><span class="s1">dump</span><span class="s2">(</span><span class="s1">self</span><span class="s2">.</span><span class="s1">price_scaler</span><span class="s2">, </span><span class="s5">'AIAppraiser_price_scaler.pkl'</span><span class="s2">)</span>
+
+    <span class="s0">def </span><span class="s1">predict</span><span class="s2">(</span><span class="s1">self</span><span class="s2">, </span><span class="s1">cup</span><span class="s2">, </span><span class="s1">hero</span><span class="s2">):</span>
+        <span class="s0">if </span><span class="s1">self</span><span class="s2">.</span><span class="s1">scaler </span><span class="s0">is None or </span><span class="s1">self</span><span class="s2">.</span><span class="s1">price_scaler </span><span class="s0">is None or </span><span class="s1">self</span><span class="s2">.</span><span class="s1">model </span><span class="s0">is None</span><span class="s2">:</span>
+            <span class="s0">raise </span><span class="s1">Exception</span><span class="s2">(</span><span class="s5">&quot;Model and scalers must be loaded or trained before prediction.&quot;</span><span class="s2">)</span>
+
+        <span class="s1">example_data </span><span class="s2">= </span><span class="s1">pd</span><span class="s2">.</span><span class="s1">DataFrame</span><span class="s2">([[</span><span class="s1">cup</span><span class="s2">, </span><span class="s1">hero</span><span class="s2">]], </span><span class="s1">columns</span><span class="s2">=[</span><span class="s5">'Cup'</span><span class="s2">, </span><span class="s5">'Hero'</span><span class="s2">])</span>
+        <span class="s1">example_data_scaled </span><span class="s2">= </span><span class="s1">self</span><span class="s2">.</span><span class="s1">scaler</span><span class="s2">.</span><span class="s1">transform</span><span class="s2">(</span><span class="s1">example_data</span><span class="s2">)</span>
+        <span class="s1">net </span><span class="s2">= </span><span class="s1">neat</span><span class="s2">.</span><span class="s1">nn</span><span class="s2">.</span><span class="s1">FeedForwardNetwork</span><span class="s2">.</span><span class="s1">create</span><span class="s2">(</span><span class="s1">self</span><span class="s2">.</span><span class="s1">model</span><span class="s2">, </span><span class="s1">self</span><span class="s2">.</span><span class="s1">config</span><span class="s2">)</span>
+        <span class="s1">predicted_value_scaled </span><span class="s2">= </span><span class="s1">net</span><span class="s2">.</span><span class="s1">activate</span><span class="s2">(</span><span class="s1">example_data_scaled</span><span class="s2">[</span><span class="s4">0</span><span class="s2">])[</span><span class="s4">0</span><span class="s2">]</span>
+
+        <span class="s3"># Inverse transform the prediction</span>
+        <span class="s1">predicted_value </span><span class="s2">= </span><span class="s1">self</span><span class="s2">.</span><span class="s1">price_scaler</span><span class="s2">.</span><span class="s1">inverse_transform</span><span class="s2">([[</span><span class="s1">predicted_value_scaled</span><span class="s2">]])[</span><span class="s4">0</span><span class="s2">][</span><span class="s4">0</span><span class="s2">]</span>
+        <span class="s0">return </span><span class="s1">predicted_value</span>
+
+    <span class="s0">def </span><span class="s1">Q_Q_plot</span><span class="s2">(</span><span class="s1">self</span><span class="s2">, </span><span class="s1">data</span><span class="s2">):</span>
+        <span class="s1">plt</span><span class="s2">.</span><span class="s1">hist</span><span class="s2">(</span><span class="s1">data</span><span class="s2">, </span><span class="s1">bins</span><span class="s2">=</span><span class="s4">10</span><span class="s2">, </span><span class="s1">alpha</span><span class="s2">=</span><span class="s4">0.6</span><span class="s2">, </span><span class="s1">color</span><span class="s2">=</span><span class="s5">'g'</span><span class="s2">)</span>
+        <span class="s1">plt</span><span class="s2">.</span><span class="s1">title</span><span class="s2">(</span><span class="s5">f'</span><span class="s0">{</span><span class="s1">data</span><span class="s2">.</span><span class="s1">name</span><span class="s0">}</span><span class="s5">-Histogram'</span><span class="s2">)</span>
+        <span class="s1">plt</span><span class="s2">.</span><span class="s1">savefig</span><span class="s2">(</span><span class="s5">f'</span><span class="s0">{</span><span class="s1">data</span><span class="s2">.</span><span class="s1">name</span><span class="s0">}</span><span class="s5">-Histogram.png'</span><span class="s2">)</span>
+        <span class="s1">plt</span><span class="s2">.</span><span class="s1">close</span><span class="s2">()</span>
+
+        <span class="s1">stats</span><span class="s2">.</span><span class="s1">probplot</span><span class="s2">(</span><span class="s1">data</span><span class="s2">, </span><span class="s1">dist</span><span class="s2">=</span><span class="s5">&quot;norm&quot;</span><span class="s2">, </span><span class="s1">plot</span><span class="s2">=</span><span class="s1">plt</span><span class="s2">)</span>
+        <span class="s1">plt</span><span class="s2">.</span><span class="s1">title</span><span class="s2">(</span><span class="s5">f'</span><span class="s0">{</span><span class="s1">data</span><span class="s2">.</span><span class="s1">name</span><span class="s0">}</span><span class="s5">-Q-Q Plot'</span><span class="s2">)</span>
+        <span class="s1">plt</span><span class="s2">.</span><span class="s1">savefig</span><span class="s2">(</span><span class="s5">f'</span><span class="s0">{</span><span class="s1">data</span><span class="s2">.</span><span class="s1">name</span><span class="s0">}</span><span class="s5">-Q_Q_pot.png'</span><span class="s2">)</span>
+        <span class="s1">plt</span><span class="s2">.</span><span class="s1">close</span><span class="s2">()</span>
+
+<span class="s0">if </span><span class="s1">__name__ </span><span class="s2">== </span><span class="s5">'__main__'</span><span class="s2">:</span>
+    <span class="s3"># Create a configuration file for NEAT</span>
+    <span class="s1">config_file </span><span class="s2">= </span><span class="s5">&quot;neat_config.txt&quot;  </span><span class="s3"># You'll need to create this file</span>
+
+    <span class="s3"># Initialize and train the model with NEAT</span>
+    <span class="s1">model </span><span class="s2">= </span><span class="s1">AI_Creait</span><span class="s2">(</span><span class="s1">config_file</span><span class="s2">, </span><span class="s5">'AIAppraiser.neat'</span><span class="s2">)</span>
+    <span class="s1">model</span><span class="s2">.</span><span class="s1">train_model_with_neat</span><span class="s2">()</span>
+
+    <span class="s3"># Make predictions using the trained model</span>
+    <span class="s0">for </span><span class="s1">index</span><span class="s2">, </span><span class="s1">row </span><span class="s0">in </span><span class="s1">model</span><span class="s2">.</span><span class="s1">df_check</span><span class="s2">.</span><span class="s1">iterrows</span><span class="s2">():</span>
+        <span class="s1">cup </span><span class="s2">= </span><span class="s1">row</span><span class="s2">[</span><span class="s5">'Cup'</span><span class="s2">]</span>
+        <span class="s1">hero </span><span class="s2">= </span><span class="s1">row</span><span class="s2">[</span><span class="s5">'Hero'</span><span class="s2">]</span>
+        <span class="s1">prediction </span><span class="s2">= </span><span class="s1">model</span><span class="s2">.</span><span class="s1">predict</span><span class="s2">(</span><span class="s1">cup</span><span class="s2">, </span><span class="s1">hero</span><span class="s2">)</span>
+        <span class="s1">print</span><span class="s2">(</span><span class="s5">f'Предсказание для Cup: </span><span class="s0">{</span><span class="s1">cup</span><span class="s0">}</span><span class="s5">, Hero: </span><span class="s0">{</span><span class="s1">hero</span><span class="s0">} </span><span class="s5">- </span><span class="s0">{</span><span class="s1">prediction</span><span class="s0">}</span><span class="s5">'</span><span class="s2">)</span>
+</pre>
+</body>
+</html>

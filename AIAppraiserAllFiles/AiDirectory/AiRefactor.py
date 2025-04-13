@@ -3,12 +3,12 @@ import neat
 import numpy as np
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler# Import MinMaxScaler
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 import os
 import joblib
-import gym
-import math  # Import the math module
+import math
 
 # 1. Define your custom activation function
 def my_sinc_function(x):
@@ -23,8 +23,8 @@ def my_l2norm_function(x):
 
 class AI_Creait():
     def __init__(self, config_file, model_path=''):
-        self.df_training = pd.read_csv('/home/I/SchoolProject/AIAppraiserAllFiles/ExecutableDirectory/first_DFFP.csv')
-        self.df_check = pd.read_csv('/home/I/SchoolProject/AIAppraiserAllFiles/ExecutableDirectory/last_DFFP.csv')
+        self.df_training = pd.read_csv(r'C:\Users\user\PycharmProjects\SchoolProject\AIAppraiserAllFiles\ExecutableDirectory\first_DFFP.csv')
+        self.df_check = pd.read_csv(r'C:\Users\user\PycharmProjects\SchoolProject\AIAppraiserAllFiles\ExecutableDirectory\last_DFFP.csv')
         self.config_file = config_file
         self.config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
                                  neat.DefaultSpeciesSet, neat.DefaultStagnation,
@@ -38,14 +38,17 @@ class AI_Creait():
 
         self.model = None
         self.scaler = None
+        self.price_scaler = None  # Scaler for the 'Price' column
         self.scaler_path = model_path.replace('.neat', '_scaler.pkl')
+        self.price_scaler_path = model_path.replace('.neat', '_price_scaler.pkl')
 
-        if os.path.exists(model_path) and os.path.exists(self.scaler_path):
-            print("Loading existing model and scaler...")
+        if os.path.exists(model_path) and os.path.exists(self.scaler_path) and os.path.exists(self.price_scaler_path):
+            print("Loading existing model and scalers...")
             self.model = joblib.load(model_path)
             self.scaler = joblib.load(self.scaler_path)
+            self.price_scaler = joblib.load(self.price_scaler_path)
         else:
-            print("Model or scaler not found. Training new model...")
+            print("Model or scalers not found. Training new model...")
 
     def df_division(self, df):
         X = df[['Cup', 'Hero']]
@@ -55,7 +58,12 @@ class AI_Creait():
     def eval_genome(self, genome, config):
         net = neat.nn.FeedForwardNetwork.create(genome, config)
         X, y = self.df_division(self.df_training)
+
+        # Scale features
         X_scaled = self.scaler.transform(X)
+
+        # Scale target variable 'Price'
+        y_scaled = self.price_scaler.transform(y.values.reshape(-1, 1)).flatten()
 
         predictions = []
         for xi in X_scaled:
@@ -63,27 +71,36 @@ class AI_Creait():
             predictions.append(output[0])
 
         predictions = np.array(predictions)
-        fitness = np.mean((predictions - y) ** 2)  # MSE as fitness
+        fitness = np.mean((predictions - y_scaled) ** 2)  # MSE as fitness
         return -fitness  # NEAT maximizes fitness, so minimize MSE
 
+
     def train_model_with_neat(self, n_splits=30):
-        if self.model is not None and self.scaler is not None:
-            print("Model and scaler already loaded. Skipping training.")
+        if self.model is not None and self.scaler is not None and self.price_scaler is not None:
+            print("Model and scalers already loaded. Skipping training.")
             return
 
         print("Starting NEAT training...")
         X, y = self.df_division(self.df_training)
+
+        # Initialize scalers
         self.scaler = StandardScaler()
+        self.price_scaler = MinMaxScaler()  # Use MinMaxScaler for 'Price'
+
+        # Scale features
         X_scaled = self.scaler.fit_transform(X)
+
+        # Scale target variable 'Price'
+        y_scaled = self.price_scaler.fit_transform(y.values.reshape(-1, 1)).flatten()
 
         # K-Fold cross-validation
         kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
         fold_fitnesses = []
 
-        for fold, (train_index, test_index) in enumerate(kf.split(X_scaled), 1):
+        for fold, (train_index, test_index) in enumerate(kf.split(X_scaled, y_scaled), 1):
             print(f"Training fold {fold}...")
             X_train, X_test = X_scaled[train_index], X_scaled[test_index]
-            y_train, y_test = y.iloc[train_index], y.iloc[test_index]
+            y_train, y_test = y_scaled[train_index], y_scaled[test_index]
 
             # Prepare the fitness function with the current fold data
             def eval_genomes(genomes, config):
@@ -132,16 +149,20 @@ class AI_Creait():
 
         joblib.dump(self.model, 'AIAppraiser.neat')
         joblib.dump(self.scaler, 'AIAppraiser_scaler.pkl')
+        joblib.dump(self.price_scaler, 'AIAppraiser_price_scaler.pkl')
 
     def predict(self, cup, hero):
-        if self.scaler is None or self.model is None:
-            raise Exception("Model and scaler must be loaded or trained before prediction.")
+        if self.scaler is None or self.price_scaler is None or self.model is None:
+            raise Exception("Model and scalers must be loaded or trained before prediction.")
 
         example_data = pd.DataFrame([[cup, hero]], columns=['Cup', 'Hero'])
         example_data_scaled = self.scaler.transform(example_data)
         net = neat.nn.FeedForwardNetwork.create(self.model, self.config)
-        predicted_value = net.activate(example_data_scaled[0])
-        return predicted_value[0]
+        predicted_value_scaled = net.activate(example_data_scaled[0])[0]
+
+        # Inverse transform the prediction
+        predicted_value = self.price_scaler.inverse_transform([[predicted_value_scaled]])[0][0]
+        return predicted_value
 
     def Q_Q_plot(self, data):
         plt.hist(data, bins=10, alpha=0.6, color='g')
