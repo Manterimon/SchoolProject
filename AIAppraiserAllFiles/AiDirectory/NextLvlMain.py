@@ -9,7 +9,7 @@ import os
 import joblib
 import math
 from typing import Tuple, Union, List, Optional, Dict, Any
-
+import goslate
 
 # Activation and aggregation functions
 def my_sinc_function(x):
@@ -358,9 +358,12 @@ def create_graph(model, file_path):
 
         # Calculate metrics
         mse = np.mean((df['Price'] - df['PredictedPrice']) ** 2)
-        r2 = np.corrcoef(df['Price'], df['PredictedPrice'])[0, 1] ** 2
+        try:
+            r2 = np.corrcoef(df['Price'], df['PredictedPrice'])[0, 1] ** 2
+        except:
+            r2 = 0
 
-        # Add title and labels
+            # Add title and labels
         plt.title(f"Actual vs Predicted Prices (MSE: {mse:.2f}, R²: {r2:.2f})")
         plt.xlabel("Account Index")
         plt.ylabel("Price")
@@ -383,4 +386,51 @@ def create_graph(model, file_path):
         return None
 
 
+def create_graph_local(user_price, predicted_price):
+    """
+        Создает и отображает график сравнения предсказанной и введенной пользователем цены.
+
+        Args:
+            predicted_price (float): Предсказанная цена.
+            user_price (float): Цена, введенная пользователем.
+        """
+    try:
+        # Определяем максимальное значение для оси Y
+        max_y = max(predicted_price, user_price, 2500)
+
+        # Создаем график
+        plt.figure(figsize=(6, 6))  # Adjust size as needed
+
+        # Координаты X для точек
+        x_values = [1, 2]  # Две точки
+
+        # Координаты Y для точек
+        y_values = [predicted_price, user_price]
+
+        # Создаем график рассеяния
+        plt.scatter(x_values, y_values, color=['red', 'blue'], s=100)  # s - размер точек
+
+        # Добавляем подписи к точкам
+        plt.text(x_values[0], y_values[0], f'Предсказанная: {predicted_price:.2f}', ha='center', va='bottom')
+        plt.text(x_values[1], y_values[1], f'Введена пользователем: {user_price:.2f}', ha='center', va='bottom')
+
+        # Настраиваем оси
+        plt.xlim(0, 3)  # Чтобы точки не были по краям
+        plt.ylim(0, max_y * 1.1)  # Y от 0 до max_y + немного места сверху
+
+        # Убираем отметки на осях x
+        plt.xticks([])
+
+        # Добавляем заголовок и подписи
+        plt.title('Сравнение цен')
+        plt.ylabel('Цена')
+
+        # Отображаем сетку для удобства
+        plt.grid(True)
+
+        # Отображаем график
+        plt.show()
+
+    except Exception as e:
+        print(f'Error creating graph: {e}')
 
